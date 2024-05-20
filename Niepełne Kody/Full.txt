@@ -1,0 +1,344 @@
+#include <Servo.h>
+
+Servo Base; //Pins and declarations
+Servo Alfa;
+Servo Beta;
+Servo Grip;
+const int LRpin = A0;
+const int UDpin = A1;
+const int trigPin = 5;
+const int echoPin = 6;
+
+bool AutomaticMode = false; //Work mode
+
+int posBase = 90;    //Variables for Manual work mode
+int posAlfa = 90;     //starting positions of all servos
+int posBeta = 90;
+int LR;
+int UD;         // left right and up down movment read from joystick
+int deadzone = 1;
+
+const int buttonPinWhite = 12;  // the pin that the pushbutton is attached to
+const int ledPinWhite = 13;    // the pin that the LED is attached to
+const int buttonPinRed = 7;  
+const int ledPinRed = 8;    
+int buttonStateWhite = 0;        // current state of the button
+int lastButtonStateWhite = 0;    // previous state of the button
+int StateWhite = 0;             // Binary state
+int buttonStateRed = 0;        
+int lastButtonStateRed = 0;    
+int StateRed = 0;             
+
+long duration;  //Variables for Automatic work mode
+int distance;
+bool MoveSide = false;      //Move side to side right (true), left (false)
+bool objStart = false;      //Object was found
+int posStart = 0;           //Position on which object was found
+
+int Accumulator = 0;  //Misc variables
+bool AlfaTime = true; //Which servo should be moved in manual mode
+
+int angles[13][2] = {   //Position Table
+65, 135,
+70, 137,
+78, 140,
+
+83, 142,
+90, 143,
+100, 149,
+
+105, 151,
+109, 154,
+123, 160,
+
+145, 170,
+151, 170,
+164, 176,
+
+172, 180
+};
+
+void move(Servo &servo, int val){   // Slow move of an given servo to the given position
+  if(servo.read() == val)     //if the servo is already on the position then don't move it
+    return;   
+
+  if(servo.read() < val)      //Move it closer to the provided position by one degree with 10ms delay between each move.
+  {
+    for(int i=servo.read()+1; i<=val; i++)
+    {
+      servo.write(i);
+      delay(10);
+    }
+  }
+
+  else
+  {
+    for(int i=servo.read()-1; i>=val; i--)
+    {
+      servo.write(i);
+      delay(10);
+    }
+  }
+}
+
+void resetValues(){ //Reseting values to original, used when changing work modes
+  posBase = 90;
+  posAlfa = 90;
+  posBeta = 90;
+  deadzone = 1;
+  buttonStateWhite = 0;
+  lastButtonStateWhite = 0;
+  StateWhite = 0;
+  buttonStateRed = 0;
+  lastButtonStateRed = 0;
+  StateRed = 0;
+  AlfaTime = true;
+  MoveSide = false; 
+  objStart = false;
+  posStart = 0;
+  distance = 1000;
+}
+
+void Automatic(){ //Automatic work mode
+  int curr = Base.read(); //Curent postion of the base servo.
+
+  //looking and reading distance of an object
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);      //Distance calculating works by sending an low signal for 2 micro seconds, then an high one for 10 micro seconds and then back to an low signal.
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);   
+  duration = pulseIn(echoPin, HIGH);        //Read the duration from the distance meter and calculate the distance from it.
+  distance = round(duration * 0.034 / 2);
+
+  if (distance > 4 && distance < 18){  //if object is in the efective range of the arms
+    
+    Serial.print("Distance: ");
+    Serial.println(distance);
+    
+    if(!objStart){        //if object was found for the first time
+      objStart = true;
+      posStart = curr;    //Remember the position of Base servo on which the object was first found
+      Serial.println("START");
+    }
+  }
+
+  else{
+    if(objStart){       //If object is no longer in view but was found before
+      Serial.println("FINISH");
+      objStart = false;
+      int MiddleOfObj;
+      MiddleOfObj = (posStart + curr)/2;  //Calculate the middle of the found object
+      move(Base, MiddleOfObj);
+      
+      digitalWrite(trigPin, LOW);
+      delayMicroseconds(2);
+      digitalWrite(trigPin, HIGH);
+      delayMicroseconds(10);
+      digitalWrite(trigPin, LOW);
+      duration = pulseIn(echoPin, HIGH);
+      distance = round(duration * 0.034 / 2);  //Calculate the distance of the object from the base
+      
+      Serial.print("Distance 2: ");
+      Serial.println(distance);
+
+      if(!(distance>4&&distance<18)){return;}   //Check if object is within the efective range of the arm, if it is then begin grabbing process.
+      move(Beta, angles[distance-5][0]);
+      move(Alfa, angles[distance-5][1]);
+      move(Grip, 120);
+
+
+      delay(2500);      //After grabing the object move it to an given drop off position
+      move(Grip, 0);  
+      delay(2000);
+      move(Alfa, 120);
+      delay(500);
+      move(Beta, 90);
+      delay(1000);
+      move(Base, 180);
+      delay(1000);
+      move(Grip, 120);
+      delay(1000);
+      move(Base, 0);
+
+      MoveSide = false;
+      delay(20);
+      return;
+    }
+  }
+
+  //MOVEMENT
+  if (!MoveSide){     //Moving from side to side, looking for an object, movement from servo base position 0 to 180 degress.
+    if(curr > 0){
+      Base.write(curr - 1);
+    }
+    else{   //if the side 180 degree was reached start moving to the other side
+      MoveSide = true;
+    }
+  }
+  else{   //same logic when reached 0 degree
+      if(curr < 180){
+      Base.write(curr + 1);
+    }
+    else{
+      MoveSide = false;
+    }
+  }
+
+  delay(20);
+}
+
+void Manual(){
+  UD = analogRead(UDpin); //read the up down side of the joystick input
+  UD -= 515;
+  UD = UD / 200;        //map the read value to the one that will be later sent to the servos
+
+  if (abs(UD)>=deadzone){   //Limit the read values and prepare moving servo base
+    posBase += UD;
+  }
+  if (posBase > 180) {
+    posBase = 180;
+  }
+  if (posBase < 0) {
+    posBase = 0;
+  }
+
+  if(AlfaTime){       //moving servo alfa
+    LR = analogRead(LRpin);
+
+    LR -= 515;
+    LR = LR / 200;
+    if (abs(LR)>=deadzone){
+      posAlfa += LR;
+    }
+    if (posAlfa > 179) {
+      posAlfa = 179;
+    }
+    if (posAlfa < 50) {
+      posAlfa = 50;
+    }
+  }
+  else{       //moving servo beta
+    LR = analogRead(LRpin);
+
+    LR -= 515;
+    LR = LR / 200;
+    if (abs(LR)>=deadzone){
+      posBeta += LR;
+    }
+    if (posBeta > 180) {
+      posBeta = 180;
+    }
+    if (posBeta < 58) {
+      posBeta = 58;
+    }
+  }
+
+  Base.write(int(posBase));   // write the values to the servos
+  Alfa.write(int(posAlfa));
+  Beta.write(int(posBeta));
+
+  if(StateWhite == 2){        //if white button was pressed
+    if (digitalRead(ledPinWhite) == HIGH){
+      digitalWrite(ledPinWhite,LOW);
+      AlfaTime = true;
+    }                                     //Change the which servo (alfa or beta) is being moved now
+    else{
+      digitalWrite(ledPinWhite,HIGH);
+      AlfaTime = false;
+    }
+  }
+
+  if(StateRed == 2){        //if red button was pressed
+    if (digitalRead(ledPinRed) == LOW){
+      digitalWrite(ledPinRed,HIGH);
+      for(int i = 180; i>=0; i--){
+        Grip.write(i);
+        delay(10);
+      }
+    }                                         //close or open the grip servo, depending on the previews state
+    else{
+      digitalWrite(ledPinRed,LOW);
+      for(int i = 0; i<=180; i++){
+        Grip.write(i);
+        delay(10);
+      }
+    }
+  }
+}
+
+void setup() {            //One time setup function
+  Base.write(90);
+  Alfa.write(90);
+  Beta.write(90);                   //Move all servos to original positions
+  Grip.write(180);
+
+  Base.attach(9);                   //atatch pins to servos
+  Alfa.attach(10);
+  Beta.attach(11);                    
+  Grip.attach(3);
+
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);        //set whether a given pin is used as an input ot output
+  pinMode(buttonPinWhite, INPUT_PULLUP);
+  pinMode(ledPinWhite, OUTPUT);
+  pinMode(buttonPinRed, INPUT_PULLUP);
+  pinMode(ledPinRed, OUTPUT);
+
+  Serial.begin(9600);                       //Begin serial comunication
+}
+
+void loop() {               //Main program loop
+
+  buttonStateRed = digitalRead(buttonPinRed);
+  StateRed = 1*buttonStateRed + 2*lastButtonStateRed;     //Read and calculate the states of the buttons (0 = held down, 1 = released, 2 = pressed, 4 = held up)
+  lastButtonStateRed = buttonStateRed;
+
+  buttonStateWhite = digitalRead(buttonPinWhite);
+  StateWhite = 1*buttonStateWhite + 2*lastButtonStateWhite;
+  lastButtonStateWhite = buttonStateWhite;
+
+  if( (StateRed == 2 || StateRed == 0) && (StateWhite == 2 || StateWhite == 0) ){             //if both buttons are curently pressed or held start accumulating for how long
+    Accumulator = Accumulator + 1;
+    Serial.print("Accumulator ");
+    Serial.println(Accumulator);
+    if(Accumulator == 200){               //if the buttons were held long enough (few seconds)
+      AutomaticMode = !AutomaticMode;         //Change work mode to the other
+      Serial.print("MODE CHANGE ");
+      Serial.println(AutomaticMode);
+      Accumulator = 0;
+  
+      digitalWrite(ledPinRed,LOW);          //blink the lights on both buttons
+      digitalWrite(ledPinWhite,LOW);
+      delay(200);
+      digitalWrite(ledPinRed,HIGH);
+      digitalWrite(ledPinWhite,HIGH);
+      delay(200);
+      digitalWrite(ledPinRed,LOW);
+      digitalWrite(ledPinWhite,LOW);
+      delay(200);
+      digitalWrite(ledPinRed,HIGH);
+      digitalWrite(ledPinWhite,HIGH);
+      delay(200);
+      digitalWrite(ledPinRed,LOW);
+      digitalWrite(ledPinWhite,LOW);
+
+      resetValues();                      //reset all the values so that any change from work modes doesn't break the loops
+      Base.write(90);
+      Alfa.write(90);
+      Beta.write(90);
+      Grip.write(180);
+    }
+    return;
+  }
+  Accumulator = 0;        //if both buttons not held reset the accumulator
+  
+  if(AutomaticMode){        //use the current work mode
+    Automatic();
+  }
+  else{
+    Manual();
+  }
+  
+  delay(10);        //small delay for stability
+}

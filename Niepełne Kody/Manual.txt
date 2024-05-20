@@ -1,0 +1,149 @@
+#include <Servo.h>
+
+
+Servo Base;  // create servo object to control a servo
+Servo Alfa;
+Servo Beta;
+Servo Grip;
+const int LRpin = A0;
+const int UDpin = A1;
+
+int posBase = 90;    // variable to store the servo position
+int posAlfa = 90;
+int posBeta = 90;
+int LR;
+int UD;
+int deadzone = 1;
+
+
+const int buttonPinWhite = 12;  // the pin that the pushbutton is attached to
+const int ledPinWhite = 13;    // the pin that the LED is attached to
+
+const int buttonPinRed = 7;  // the pin that the pushbutton is attached to
+const int ledPinRed = 8;    // the pin that the LED is attached to
+
+int buttonStateWhite = 0;        // current state of the button
+int lastButtonStateWhite = 0;    // previous state of the button
+int StateWhite = 0;             // Binary state
+
+int buttonStateRed = 0;        // current state of the button
+int lastButtonStateRed = 0;    // previous state of the button
+int StateRed = 0;             // Binary state
+
+bool AlfaTime = true;
+
+void setup() {
+  Base.write(90);
+  Alfa.write(90);
+  Beta.write(90);
+  Grip.write(0);
+
+  Base.attach(9);  // attaches the servo on pin 9 to the servo object
+  Alfa.attach(10);
+  Beta.attach(11);
+  Grip.attach(3);
+
+  pinMode(buttonPinWhite, INPUT_PULLUP);
+  pinMode(ledPinWhite, OUTPUT);
+
+  pinMode(buttonPinRed, INPUT_PULLUP);
+  pinMode(ledPinRed, OUTPUT);
+  
+  Serial.begin(9600);
+}
+
+void loop() {
+
+  UD = analogRead(UDpin);
+  UD -= 515;
+  UD = UD / 200;
+  if (abs(UD)>=deadzone){
+    posBase += UD;
+  }
+  if (posBase > 180) {
+    posBase = 180;
+  }
+  if (posBase < 0) {
+    posBase = 0;
+  }
+
+  if(AlfaTime){
+    LR = analogRead(LRpin);
+
+    LR -= 515;
+    LR = LR / 200;
+    if (abs(LR)>=deadzone){
+      posAlfa += LR;
+    }
+    if (posAlfa > 179) {
+      posAlfa = 179;
+    }
+    if (posAlfa < 50) {
+      posAlfa = 50;
+    }
+  }
+  else{
+    LR = analogRead(LRpin);
+
+    LR -= 515;
+    LR = LR / 200;
+    if (abs(LR)>=deadzone){
+      posBeta += LR;
+    }
+    if (posBeta > 180) {
+      posBeta = 180;
+    }
+    if (posBeta < 58) {
+      posBeta = 58;
+    }
+  }
+
+  Serial.println(Beta.read());
+
+  Base.write(int(posBase));
+  Alfa.write(int(posAlfa));
+  Beta.write(int(posBeta));
+
+  buttonStateWhite = digitalRead(buttonPinWhite);
+  StateWhite = 1*buttonStateWhite + 2*lastButtonStateWhite;
+  /*Serial.print(StateWhite);
+  Serial.print(" ");
+  Serial.print(buttonStateWhite);
+  Serial.println(lastButtonStateWhite);*/
+  lastButtonStateWhite = buttonStateWhite;
+
+  buttonStateRed = digitalRead(buttonPinRed);
+  StateRed = 1*buttonStateRed + 2*lastButtonStateRed;
+  lastButtonStateRed = buttonStateRed;
+
+  if(StateWhite == 2){
+    if (digitalRead(ledPinWhite) == HIGH){
+      digitalWrite(ledPinWhite,LOW);
+      AlfaTime = true;
+    }
+    else{
+      digitalWrite(ledPinWhite,HIGH);
+      AlfaTime = false;
+    }
+  }
+
+  if(StateRed == 2){
+    if (digitalRead(ledPinRed) == HIGH){
+      digitalWrite(ledPinRed,LOW);
+      for(int i = 180; i>=0; i--){
+        Grip.write(i);
+        delay(10);
+      }
+    }
+    else{
+      digitalWrite(ledPinRed,HIGH);
+      for(int i = 0; i<=180; i++){
+        Grip.write(i);
+        delay(10);
+      }
+    }
+  }
+
+  delay(75);
+
+}

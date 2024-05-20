@@ -1,0 +1,79 @@
+#include <Servo.h>
+
+Servo Base; 
+const int trigPin = 5;
+const int echoPin = 6;
+long duration;
+float distance;
+bool MoveSide = false;
+
+bool objStart = false;
+int posStart = 0;
+
+void setup() {
+  Base.write(90);
+  Base.attach(9);
+
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+
+  Serial.begin(9600);
+}
+
+void loop() {
+  int curr = Base.read();
+
+  //DISTANCE
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  duration = pulseIn(echoPin, HIGH);
+  distance = duration * 0.034 / 2;
+
+  if (distance > 3 && distance < 20){
+    Serial.print("Distance: ");
+    Serial.println(distance);
+    
+    if(!objStart){
+      objStart = true;
+      posStart = curr;
+      Serial.println("START");
+    }
+  }
+  else{
+    if(objStart){
+      Serial.println("FINISH");
+      objStart = false;
+      int MiddleOfObj;
+      MiddleOfObj = (posStart + curr)/2;
+      Base.write(MiddleOfObj);
+      delay(2000);
+      Base.write(0);
+      MoveSide = false;
+      delay(20);
+      return;
+    }
+  }
+
+  //MOVEMENT
+  if (!MoveSide){
+    if(curr > 0){
+      Base.write(curr - 1);
+    }
+    else{
+      MoveSide = true;
+    }
+  }
+  else{
+      if(curr < 180){
+      Base.write(curr + 1);
+    }
+    else{
+      MoveSide = false;
+    }
+  }
+
+  delay(20);
+}

@@ -1,0 +1,78 @@
+/* Sweep
+ by BARRAGAN <http://barraganstudio.com>
+ This example code is in the public domain.
+
+ modified 8 Nov 2013
+ by Scott Fitzgerald
+ https://www.arduino.cc/en/Tutorial/LibraryExamples/Sweep
+*/
+
+#include <Servo.h>
+
+int mapNumber(int inputNum) {
+  // Define the range of input and output
+  int inputMin = 0;
+  int inputMax = 1023;
+  int outputMin = 0;
+  int outputMax = 180;
+  
+  // Calculate the slope and intercept of the linear mapping
+  float slope = (outputMax - outputMin) / (float)(inputMax - inputMin);
+  int intercept = outputMin - inputMin * slope;
+  
+  // Map the input number to the output range
+  int outputNum = inputNum * slope + intercept;
+  
+  return outputNum;
+}
+
+Servo myservo;  // create servo object to control a servo
+Servo myservo2;
+const int LRpin = A0;
+const int UDpin = A1;
+// twelve servo objects can be created on most boards
+
+int pos = 0;    // variable to store the servo position
+int LR;
+int UD;
+int deadzone = 1;
+
+void setup() {
+  myservo.attach(9);  // attaches the servo on pin 9 to the servo object
+  Serial.begin(9600);
+  myservo.write(90);
+  myservo2.attach(10);
+}
+
+void loop() {
+  myservo2.write(90);
+
+  LR = analogRead(LRpin);
+  UD = analogRead(UDpin);
+
+  UD -= 515;
+  UD = UD / 200;
+  if (abs(UD)>=deadzone){
+    pos += UD;
+  }
+  // pos += 90;
+  if (pos > 180) {
+    pos = 180;
+  }
+  if (pos < 0) {
+    pos = 0;
+  }
+  s
+  Serial.print(LR);
+  Serial.print(" ");
+  Serial.println(UD);
+
+  // int pwmValue = mapNumber(pos);
+  int pwmValue = pos;
+  Serial.print(" ");
+  Serial.println(pwmValue);
+
+  myservo.write(pwmValue);
+  delay(20);
+
+}

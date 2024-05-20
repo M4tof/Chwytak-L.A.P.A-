@@ -1,0 +1,87 @@
+const int buttonPinWhite = 12;  // the pin that the pushbutton is attached to
+const int ledPinWhite = 13;    // the pin that the LED is attached to
+
+const int buttonPinRed = 7;  // the pin that the pushbutton is attached to
+const int ledPinRed = 8;    // the pin that the LED is attached to
+
+int buttonStateWhite = 0;        // current state of the button
+int lastButtonStateWhite = 0;    // previous state of the button
+int StateWhite = 0;             // Binary state
+
+int buttonStateRed = 0;        // current state of the button
+int lastButtonStateRed = 0;    // previous state of the button
+int StateRed = 0;             // Binary state
+
+int Acc = 0;              //Accumulator for held time
+int MODE = 0;
+
+void setup() {
+  pinMode(buttonPinRed, INPUT_PULLUP);
+  pinMode(ledPinRed, OUTPUT);
+
+  pinMode(buttonPinWhite, INPUT_PULLUP);
+  pinMode(ledPinWhite, OUTPUT);
+  Serial.begin(9600);
+}
+
+// Guziki States:
+// 3 not held
+// 2 pressed
+// 0 held
+// 1 released
+
+void loop() {
+  // read the pushbutton input pin:
+  buttonStateRed = digitalRead(buttonPinRed);
+  StateRed = 1*buttonStateRed + 2*lastButtonStateRed;
+  lastButtonStateRed = buttonStateRed;
+
+  buttonStateWhite = digitalRead(buttonPinWhite);
+  StateWhite = 1*buttonStateWhite + 2*lastButtonStateWhite;
+  /*Serial.print(StateWhite);
+  Serial.print(" ");
+  Serial.print(buttonStateWhite);
+  Serial.println(lastButtonStateWhite);*/
+  lastButtonStateWhite = buttonStateWhite;
+
+
+  if( (StateRed == 2 || StateRed == 0) && (StateWhite == 2 || StateWhite == 0) ){
+    digitalWrite(2,LOW);
+    delay(1000);
+    digitalWrite(2,HIGH);
+    delay(1000);
+    digitalWrite(2,LOW);
+    Acc++;
+    if(Acc == 3){
+      Serial.println(MODE);
+      digitalWrite(3,!MODE);
+      MODE=!MODE;
+      Acc = 0;
+    }
+    return;
+  }
+  else{
+    digitalWrite(2,LOW);
+    Acc = 0;
+  }
+  
+  if(StateRed == 2){
+    if (digitalRead(ledPinRed) == HIGH){
+      digitalWrite(ledPinRed,LOW);
+    }
+    else{
+      digitalWrite(ledPinRed,HIGH);
+    }
+  }
+
+  if(StateWhite == 2){
+    if (digitalRead(ledPinWhite) == HIGH){
+      digitalWrite(ledPinWhite,LOW);
+    }
+    else{
+      digitalWrite(ledPinWhite,HIGH);
+    }
+  }
+
+  delay(75); // Reduce delay for responsiveness
+}
